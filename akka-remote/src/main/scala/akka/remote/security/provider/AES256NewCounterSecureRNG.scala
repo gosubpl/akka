@@ -13,11 +13,11 @@ import akka.remote.security.provider.SeedSize.Seed256
  * The only method used by netty ssl is engineNextBytes(bytes)
  * This RNG is good to use to prevent startup delay when you don't have Internet access to random.org
  */
-class NewAES256CounterSecureRNG extends java.security.SecureRandomSpi {
+class AES256NewCounterSecureRNG extends java.security.SecureRandomSpi {
   /**Singleton instance. */
   private final val SOURCE: SecureRandom = new SecureRandom
 
-  private val rng = new ShadowAESCounterRNG(engineGenerateSeed(Seed256))
+  private val rng = new AESNewCounterRNG(engineGenerateSeed(Seed256))
 
   /**
    * This is managed internally by AESCounterRNG

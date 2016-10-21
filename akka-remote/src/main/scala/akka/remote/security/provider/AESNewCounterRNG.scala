@@ -5,7 +5,7 @@ import java.security.{GeneralSecurityException, Key}
 import java.util.Random
 import javax.crypto.Cipher
 
-class ShadowAESCounterRNG(val seed: Array[Byte]) extends Random {
+class AESNewCounterRNG(val seed: Array[Byte]) extends Random {
   private val counter: Array[Byte] = new Array[Byte](16) // beware, mutable state
   private var index : Int = 0
   private var currentBlock : Array[Byte] = null // FIXME: all very bad
