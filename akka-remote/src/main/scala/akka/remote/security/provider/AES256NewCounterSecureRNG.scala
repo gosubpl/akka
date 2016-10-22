@@ -7,6 +7,8 @@ import java.security.SecureRandom
 
 import akka.remote.security.provider.SeedSize.Seed256
 
+// FIXME: consider renaming later to AES256CounterBuiltinRNG
+
 /**
  * INTERNAL API
  * This class is a wrapper around the 256-bit AESCounterRNG algorithm provided by http://maths.uncommons.org/
