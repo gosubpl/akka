@@ -1,33 +1,33 @@
 package akka.remote.security.provider
 
 import java.nio.ByteBuffer
-import java.security.{GeneralSecurityException, Key}
+import java.security.{ GeneralSecurityException, Key }
 import java.util.Random
 import javax.crypto.Cipher
 
 class AESNewCounterRNG(val seed: Array[Byte]) extends Random {
   private val counter: Array[Byte] = new Array[Byte](16) // beware, mutable state
-  private var index : Int = 0
-  private var currentBlock : Array[Byte] = null // FIXME: all very bad
+  private var index: Int = 0
+  private var currentBlock: Array[Byte] = null // FIXME: all very bad
 
   private val cipher = Cipher.getInstance("AES/ECB/NoPadding")
   cipher.init(Cipher.ENCRYPT_MODE, new this.AESKey(seed))
 
   /**
-    * Generates a single 128-bit block (16 bytes).
-    *
-    * @throws GeneralSecurityException If there is a problem with the cipher
-    *                                  that generates the random data.
-    * @return A 16-byte block of random data.
-    */
+   * Generates a single 128-bit block (16 bytes).
+   *
+   * @throws GeneralSecurityException If there is a problem with the cipher
+   *                                  that generates the random data.
+   * @return A 16-byte block of random data.
+   */
   @throws[GeneralSecurityException]
   private def nextBlock: Array[Byte] = { // why not handle exceptions in this function...
-  var i: Int = 0
+    var i: Int = 0
     if (i < counter.length) {
       do {
         counter(i) = (counter(i) + 1.toByte).toByte
         i += 1
-      } while ((i < counter.length ) && (counter(i-1) == 0))
+      } while ((i < counter.length) && (counter(i - 1) == 0))
     }
     cipher.doFinal(counter)
   }
@@ -40,9 +40,8 @@ class AESNewCounterRNG(val seed: Array[Byte]) extends Random {
         try {
           currentBlock = nextBlock
           index = 0
-        }
-        catch { // is this possible at all - check - oh no, even more exceptions are possible...
-          case ex: GeneralSecurityException => {
+        } catch { // is this possible at all - check - oh no, even more exceptions are possible...
+          case ex: GeneralSecurityException ⇒ {
             throw new IllegalStateException("Failed creating next random block.", ex)
           }
         }
@@ -55,8 +54,8 @@ class AESNewCounterRNG(val seed: Array[Byte]) extends Random {
   }
 
   /**
-    * Trivial key implementation for use with AES cipher.
-    */
+   * Trivial key implementation for use with AES cipher.
+   */
   final private class AESKey(val keyData: Array[Byte]) extends Key {
     def getAlgorithm: String = "AES"
     def getFormat: String = "RAW"
