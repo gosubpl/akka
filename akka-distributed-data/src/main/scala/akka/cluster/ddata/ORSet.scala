@@ -248,8 +248,16 @@ final class ORSet[A] private[akka] (
     val newVvector = vvector + node
     val newDot = VersionVector(node, newVvector.versionAt(node))
     val newDelta = _delta match {
-      case Some(d) ⇒ Some(new ORSet[A](d.elementsMap + (element → newDot), d.vvector.merge(newVvector), true, d.removals))
-      case None    ⇒ Some(new ORSet[A](Map(element → newDot), newVvector, true, Set.empty[A]))
+      case Some(d) ⇒ {
+        // local causality, remove added from removals before bumping vvector
+        val newRemovals = if (d.removals.contains(element))
+          d.removals - element
+        else
+          d.removals
+
+        Some(new ORSet[A](d.elementsMap + (element → newDot), d.vvector.merge(newVvector), true, newRemovals))
+      }
+      case None ⇒ Some(new ORSet[A](Map(element → newDot), newVvector, true, Set.empty[A]))
     }
     assignAncestor(new ORSet(elementsMap = elementsMap.updated(element, newDot), vvector = newVvector, _delta = newDelta))
   }
@@ -272,7 +280,8 @@ final class ORSet[A] private[akka] (
     println("element " + element.toString)
     //    println("set: " + this.toString)
     val newDelta = _delta match {
-      case Some(d) ⇒ Some(new ORSet[A](d.elementsMap, d.vvector.merge(vvector), true, d.removals + element))
+      // local causality, remove removed from additions
+      case Some(d) ⇒ Some(new ORSet[A](d.elementsMap - element, d.vvector.merge(vvector), true, d.removals + element))
       case None    ⇒ Some(new ORSet[A](Map.empty[A, ORSet.Dot], vvector, true, Set.apply[A](element)))
     }
     assignAncestor(copy(elementsMap = elementsMap - element, _delta = newDelta))
@@ -290,7 +299,8 @@ final class ORSet[A] private[akka] (
    */
   private[akka] def clear(node: UniqueAddress): ORSet[A] = {
     val newDelta = _delta match {
-      case Some(d) ⇒ Some(new ORSet[A](d.elementsMap, d.vvector.merge(vvector), true, d.removals ++ elements))
+      // local causality, remove removed from past additions
+      case Some(d) ⇒ Some(new ORSet[A](d.elementsMap -- elements, d.vvector.merge(vvector), true, d.removals ++ elements))
       case None    ⇒ Some(new ORSet[A](Map.empty[A, ORSet.Dot], vvector, true, elements))
     }
     assignAncestor(copy(elementsMap = Map.empty, _delta = newDelta))
@@ -317,9 +327,7 @@ final class ORSet[A] private[akka] (
    * Keep only common dots, and dots that are not dominated by the other sides version vector
    */
   override def merge(that: ORSet[A]): ORSet[A] = {
-    println("BEFORE MERGE:")
-    println("this: " + this.toString)
-    println("that: " + that.toString)
+    val before = "BEFORE MERGE: " + " this: " + this.toString + " isDelta " + this.isDelta + "/ that: " + that.toString + " isDelta " + that.isDelta
     def mergeNonDeltas(lhs: ORSet[A], rhs: ORSet[A]): ORSet[A] = {
       val commonKeys =
         if (lhs.elementsMap.size < rhs.elementsMap.size)
@@ -348,10 +356,15 @@ final class ORSet[A] private[akka] (
     else if (this.isAncestorOf(that)) that.clearAncestor()
     else if (this.isDelta && that.isDelta) {
       println("TWO DELTAS")
-      val rhs = new ORSet(this.elementsMap ++ that.elementsMap, that.vvector)
-      val lhs = new ORSet(that.elementsMap ++ this.elementsMap, this.vvector)
+      val rhs = new ORSet(this.elementsMap ++ that.elementsMap -- that.removals, that.vvector)
+      val lhs = new ORSet(that.elementsMap ++ this.elementsMap -- this.removals, this.vvector)
       val mergedDeltas = mergeNonDeltas(rhs, lhs)
-      copy(mergedDeltas.elementsMap, mergedDeltas.vvector, true, this.removals ++ that.removals)
+      val newElementsMap = mergedDeltas.elementsMap
+      println("NEW ELEMENTS map: " + newElementsMap.keys.toList.toString)
+      // find surviving removals
+      val newRemovals = this.removals ++ that.removals -- newElementsMap.keys
+      println("NEW REMOVALS")
+      copy(newElementsMap, mergedDeltas.vvector, true, newRemovals)
     } else {
       // for delta and non-delta we need to do three-way merge
       val mergedORSets = if (this.isDelta) {
@@ -367,8 +380,7 @@ final class ORSet[A] private[akka] (
 
       clearAncestor()
       val result = mergedORSets
-      println("AFTER MERGE:")
-      println("result " + result.toString)
+      println(before + " / AFTER MERGE: " + " result " + result.toString)
       result
     }
   }
