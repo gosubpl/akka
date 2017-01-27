@@ -242,6 +242,9 @@ final class ORSet[A] private[akka] (
    * INTERNAL API
    */
   private[akka] def add(node: UniqueAddress, element: A): ORSet[A] = {
+    println("ADDITION: ")
+    println("element " + element.toString)
+    //    println("set: " + this.toString)
     val newVvector = vvector + node
     val newDot = VersionVector(node, newVvector.versionAt(node))
     val newDelta = _delta match {
@@ -265,6 +268,9 @@ final class ORSet[A] private[akka] (
    * INTERNAL API
    */
   private[akka] def remove(node: UniqueAddress, element: A): ORSet[A] = {
+    println("REMOVAL: ")
+    println("element " + element.toString)
+    //    println("set: " + this.toString)
     val newDelta = _delta match {
       case Some(d) ⇒ Some(new ORSet[A](d.elementsMap, d.vvector.merge(vvector), true, d.removals + element))
       case None    ⇒ Some(new ORSet[A](Map.empty[A, ORSet.Dot], vvector, true, Set.apply[A](element)))
@@ -311,6 +317,9 @@ final class ORSet[A] private[akka] (
    * Keep only common dots, and dots that are not dominated by the other sides version vector
    */
   override def merge(that: ORSet[A]): ORSet[A] = {
+    println("BEFORE MERGE:")
+    println("this: " + this.toString)
+    println("that: " + that.toString)
     def mergeNonDeltas(lhs: ORSet[A], rhs: ORSet[A]): ORSet[A] = {
       val commonKeys =
         if (lhs.elementsMap.size < rhs.elementsMap.size)
@@ -326,23 +335,41 @@ final class ORSet[A] private[akka] (
 
       new ORSet(entries, mergedVvector)
     }
+    def mergeDeltaNonDelta(delta: ORSet[A], non_delta: ORSet[A]): ORSet[A] = {
+      // first merge with removals
+      val lhs = new ORSet(non_delta.elementsMap -- delta.removals, delta.vvector)
+      val rhs = mergeNonDeltas(lhs, non_delta)
+      // then merge with additions (new additions win)
+      val lhs2 = new ORSet(non_delta.elementsMap ++ delta.elementsMap, delta.vvector)
+      // not sure this necessary, but... maybe for dot-pruning
+      mergeNonDeltas(lhs2, rhs)
+    }
     if ((this eq that) || that.isAncestorOf(this)) this.clearAncestor()
     else if (this.isAncestorOf(that)) that.clearAncestor()
     else if (this.isDelta && that.isDelta) {
-      val mergedDeltas = mergeNonDeltas(this, that)
+      println("TWO DELTAS")
+      val rhs = new ORSet(this.elementsMap ++ that.elementsMap, that.vvector)
+      val lhs = new ORSet(that.elementsMap ++ this.elementsMap, this.vvector)
+      val mergedDeltas = mergeNonDeltas(rhs, lhs)
       copy(mergedDeltas.elementsMap, mergedDeltas.vvector, true, this.removals ++ that.removals)
     } else {
+      // for delta and non-delta we need to do three-way merge
       val mergedORSets = if (this.isDelta) {
-        val lhs = new ORSet((that.elementsMap ++ this.elementsMap) -- this.removals, this.vvector)
-        mergeNonDeltas(lhs, that)
+        println("ONE DELTA")
+        mergeDeltaNonDelta(this, that)
       } else if (that.isDelta) {
-        val rhs = new ORSet((this.elementsMap ++ that.elementsMap) -- that.removals, that.vvector)
-        mergeNonDeltas(this, rhs)
-      } else
+        println("ONE DELTA")
+        mergeDeltaNonDelta(that, this)
+      } else {
+        println("NO DELTAs")
         mergeNonDeltas(this, that)
+      }
 
       clearAncestor()
-      mergedORSets
+      val result = mergedORSets
+      println("AFTER MERGE:")
+      println("result " + result.toString)
+      result
     }
   }
 
