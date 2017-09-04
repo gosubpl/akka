@@ -463,7 +463,10 @@ final class ORSet[A] private[akka] (
         elementsMap
     }
     clearAncestor()
-    val newVvector = vvector.merge(that.vvector)
+
+    val (thatVvectorNode, thatVvectorVersion) = thatDot.versionsIterator.toList.head
+    val thatVvector = VersionVector(thatVvectorNode, thatVvectorVersion)
+    val newVvector = vvector.merge(thatVvector)
     new ORSet(newElementsMap, newVvector)
   }
 
