@@ -331,9 +331,11 @@ final class ORMap[A, B <: ReplicatedData] private[akka] (
           val mergedValue = thisValue.merge(thatValue.asInstanceOf[thisValue.T]).asInstanceOf[B]
           mergedValues = mergedValues.updated(key, mergedValue)
         case (Some(thisValue), None) ⇒
-          mergedValues = mergedValues.updated(key, thisValue)
+          if (mergedKeys.contains(key))
+            mergedValues = mergedValues.updated(key, thisValue)
         case (None, Some(thatValue)) ⇒
-          mergedValues = mergedValues.updated(key, thatValue)
+          if (mergedKeys.contains(key))
+            mergedValues = mergedValues.updated(key, thatValue)
         case (None, None) ⇒ throw new IllegalStateException(s"missing value for $key")
       }
     }
@@ -405,7 +407,9 @@ final class ORMap[A, B <: ReplicatedData] private[akka] (
               } else {
                 value match {
                   case _: ReplicatedDelta ⇒
+                    println(s"\n\n[GZOO] in question: key $key mergedValues $mergedValues")
                     mergedValues = mergedValues + (key → mergeValue(value.asInstanceOf[ReplicatedDelta].zero, value))
+                    println(s"\n\n[GZOO AFTER] in question: key $key zero ${value.asInstanceOf[ReplicatedDelta].zero} mergedValues $mergedValues")
                   case _ ⇒
                     mergedValues = mergedValues + (key → value.asInstanceOf[B])
                 }

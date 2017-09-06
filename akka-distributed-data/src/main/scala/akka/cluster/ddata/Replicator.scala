@@ -1252,7 +1252,7 @@ final class Replicator(settings: ReplicatorSettings) extends Actor with ActorLog
 
   def receiveGet(key: KeyR, consistency: ReadConsistency, req: Option[Any]): Unit = {
     val localValue = getData(key.id)
-    log.debug("Received Get for key [{}]", key)
+    log.debug("Received Get for key [{}] the data is: [{}]", key, dataEntries)
     if (isLocalGet(consistency)) {
       val reply = localValue match {
         case Some(DataEnvelope(DeletedData, _, _)) ⇒ DataDeleted(key, req)

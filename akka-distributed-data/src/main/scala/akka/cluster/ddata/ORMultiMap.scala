@@ -69,9 +69,16 @@ final class ORMultiMap[A, B] private[akka] (
 
   override def merge(that: T): T =
     if (withValueDeltas == that.withValueDeltas) {
-      if (withValueDeltas)
-        new ORMultiMap(underlying.mergeRetainingDeletedValues(that.underlying), withValueDeltas)
-      else
+      if (withValueDeltas) {
+        val newUnderlying = underlying.mergeRetainingDeletedValues(that.underlying)
+        val nVals = newUnderlying.values.filterNot(elem ⇒ (!newUnderlying.keys.contains(elem._1)) && elem._2.isEmpty)
+        val prunDone = newUnderlying.values.map(elem ⇒ !newUnderlying.keys.contains(elem._1) && elem._2.isEmpty)
+        //        println(s"\n\n[WOOT][MERGE] newUnder: ${newUnderlying.values}\nnVals: $nVals\n prune? $prunDone")
+        val bad = new ORMultiMap[A, B](new ORMap(newUnderlying.keys, nVals, newUnderlying.zeroTag, newUnderlying.delta), withValueDeltas)
+        val good = new ORMultiMap(newUnderlying, withValueDeltas)
+        //        println(s"\n\n\n[DIFF][MERGE] bad ${bad.underlying.zeroTag} badtag $bad\ngood ${good.underlying.zeroTag} goodtag $good")
+        bad
+      } else
         new ORMultiMap(underlying.merge(that.underlying), withValueDeltas)
     } else throw new IllegalArgumentException("Trying to merge two ORMultiMaps of different map sub-type")
 
@@ -253,9 +260,16 @@ final class ORMultiMap[A, B] private[akka] (
   override def delta: Option[D] = underlying.delta
 
   override def mergeDelta(thatDelta: D): ORMultiMap[A, B] =
-    if (withValueDeltas)
-      new ORMultiMap(underlying.mergeDeltaRetainingDeletedValues(thatDelta), withValueDeltas)
-    else
+    if (withValueDeltas) {
+      val newUnderlying = underlying.mergeDeltaRetainingDeletedValues(thatDelta)
+      val nVals = newUnderlying.values.filterNot(elem ⇒ !newUnderlying.keys.contains(elem._1) && elem._2.isEmpty)
+      val prunDone = newUnderlying.values.map(elem ⇒ !newUnderlying.keys.contains(elem._1) && elem._2.isEmpty)
+      //      println(s"\n\n[WOOT][MDELTA] newUnderD: ${newUnderlying.values}\nnValsD: $nVals\nprune?: $prunDone")
+      val bad = new ORMultiMap[A, B](new ORMap(newUnderlying.keys, nVals, newUnderlying.zeroTag, newUnderlying.delta), withValueDeltas)
+      val good = new ORMultiMap(newUnderlying, withValueDeltas)
+      //      println(s"\n\n\n[DIFF][MDELTA] bad ${bad.underlying.zeroTag} badtag $bad\ngood ${good.underlying.zeroTag} goodtag $good")
+      bad
+    } else
       new ORMultiMap(underlying.mergeDelta(thatDelta), withValueDeltas)
 
   override def modifiedByNodes: Set[UniqueAddress] =
